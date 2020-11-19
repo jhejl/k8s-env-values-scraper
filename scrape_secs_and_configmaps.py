@@ -14,16 +14,18 @@ to verify what external resources availability one should need to check first.
 """
 
 import base64
+import re
+
 import ipaddress
 import uritools
 import validators
-import re
 
 from enum import Enum
 from pprint import pprint
 
 from kubernetes import client, config, watch
 from kubernetes import client, config
+from tabulate import tabulate
 
 SCRAPED_NAMESPACE_REGEX = r'.*-(prod|stage)$'
 
@@ -48,14 +50,14 @@ def verify_value(value):
     service.
     """
     if uritools.isuri(value):
-        return (value, 'URI')
+        return [value, 'URI']
     try:
         ipaddress.ip_address(str(value))
-        return (value, 'IP') 
+        return [value, 'IP'] 
     except (ipaddress.AddressValueError, ValueError) as e:
         pass 
     if validators.domain(value):
-        return (value, 'DOMAIN')
+        return [value, 'DOMAIN']
 
 def check_ref_values(ref_data, decoder=str):
     """
@@ -69,8 +71,8 @@ def check_ref_values(ref_data, decoder=str):
         decoded_value = decoder(value)
         verified_value = verify_value(decoded_value)
         if verified_value:
-            verified_values.append((key, verified_value))
-    return list(filter(None, verified_values))
+            verified_values.append([key] + verified_value)
+    return verified_values
 
 def main():
     """Here comes the magic."""
@@ -96,17 +98,16 @@ def main():
                for env_from in container.env_from:
                    if env_from.config_map_ref:
                        config_map_name = env_from.config_map_ref.name 
-#                        print(f'\t Container: {container.name:<20} ConfigMap: {env_from.config_map_ref.name}')
-#                        print(core_v1.read_namespaced_config_map(
-#                            config_map_name, namespace))
-#                        print("\n---- Checking ConfigMap values")
-                       suspicious_values += check_ref_values(core_v1.read_namespaced_config_map(env_from.config_map_ref.name, namespace).data, decoder=str)
+                       suspicious_values += check_ref_values(
+                           core_v1.read_namespaced_config_map(
+                               env_from.config_map_ref.name, namespace).data,
+                               decoder=str)
                    if env_from.secret_ref:
-#                        print(f'\t Container: {container.name:<20} Secret: {env_from.secret_ref.name}')
-#                        print(core_v1.read_namespaced_secret(env_from.secret_ref.name, namespace))
-#                        print("\n---- Checking Secret values")
-                       suspicious_values += check_ref_values(core_v1.read_namespaced_secret(env_from.secret_ref.name, namespace).data, decoder=decode_base64)
-            pprint(suspicious_values)
+                       suspicious_values += check_ref_values(
+                           core_v1.read_namespaced_secret(
+                           env_from.secret_ref.name, namespace).data,
+                           decoder=decode_base64)
+            print(tabulate(suspicious_values))
 
 #             break
 
