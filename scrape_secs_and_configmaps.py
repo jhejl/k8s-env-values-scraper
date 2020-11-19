@@ -50,6 +50,8 @@ def verify_value(value):
     check the value, as it seems to be an external resource for the k8s
     service.
     """
+    # Three way decission logic ... simple, so spend some time with it,
+    #  somewhen
     if uritools.isuri(value):
         return [value, 'URI']
     try:
@@ -58,6 +60,8 @@ def verify_value(value):
     except (ipaddress.AddressValueError, ValueError):
         pass
     if validators.domain(value):
+        # TODO(jhejl): This don't resolve the value, so it may generate
+        #  the FP such some.queue.stream in case of RMQ name for example
         return [value, 'DOMAIN']
 
 
