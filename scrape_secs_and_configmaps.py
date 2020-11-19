@@ -23,15 +23,20 @@ import validators
 from kubernetes import client, config
 from tabulate import tabulate
 
-SCRAPED_NAMESPACE_REGEX = r'.*-(prod|stage)$'
+SCRAPED_NAMESPACE_REGEX = r'.*-(prod|stage|dev)$'
 
 
 def decode_base64(base64_message):
     """Basic base64 decode wrapper function."""
-    decoded_value = base64.b64decode(
-        base64_message.encode('ascii')).decode('ascii')
+    try:
+        decoded_value = base64.b64decode(
+            base64_message.encode('ascii')).decode('ascii')
 
-    return(decoded_value)
+        return(decoded_value)
+    except UnicodeDecodeError:
+        # To be honest I don't care, yet
+        # TODO - log the issue here ...
+        return base64_message
 
 
 def verify_value(value):
@@ -122,3 +127,5 @@ if __name__ == '__main__':
 
 # TODOs
 #  - pass some things through the cmdline args
+#  - utilize logging module to log failures in parsing
+#    - for example in case someone will put plain string into the secrets value
