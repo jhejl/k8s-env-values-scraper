@@ -9,7 +9,7 @@ Concretly it's:
   - DOMAIN name
 
 One can use this tool before migrating the k8s service to another cluster
-to verify what external resources availability one should need to check first. 
+to verify what external resources availability one should need to check first.
 
 """
 
@@ -20,10 +20,6 @@ import ipaddress
 import uritools
 import validators
 
-from enum import Enum
-from pprint import pprint
-
-from kubernetes import client, config, watch
 from kubernetes import client, config
 from tabulate import tabulate
 
@@ -53,11 +49,12 @@ def verify_value(value):
         return [value, 'URI']
     try:
         ipaddress.ip_address(str(value))
-        return [value, 'IP'] 
-    except (ipaddress.AddressValueError, ValueError) as e:
-        pass 
+        return [value, 'IP']
+    except (ipaddress.AddressValueError, ValueError):
+        pass
     if validators.domain(value):
         return [value, 'DOMAIN']
+
 
 def check_ref_values(ref_data, decoder=str):
     """
@@ -74,9 +71,11 @@ def check_ref_values(ref_data, decoder=str):
             verified_values.append([key] + verified_value)
     return verified_values
 
+
 def main():
     """Here comes the magic."""
-    # Configs can be set in Configuration class directly or using helper utility
+    # Configs can be set in Configuration class directly or using helper
+    #  utility
     config.load_kube_config()
     core_v1 = client.CoreV1Api()
     apps_v1 = client.AppsV1Api()
@@ -93,20 +92,19 @@ def main():
                 continue
             containers = deployment.items[0].spec.template.spec.containers
             for container in containers:
-               if container.env_from == None:
-                   continue
-               for env_from in container.env_from:
-                   if env_from.config_map_ref:
-                       config_map_name = env_from.config_map_ref.name 
-                       suspicious_values += check_ref_values(
-                           core_v1.read_namespaced_config_map(
-                               env_from.config_map_ref.name, namespace).data,
-                               decoder=str)
-                   if env_from.secret_ref:
-                       suspicious_values += check_ref_values(
-                           core_v1.read_namespaced_secret(
-                           env_from.secret_ref.name, namespace).data,
-                           decoder=decode_base64)
+                if not container.env_from:
+                    continue
+                for env_from in container.env_from:
+                    if env_from.config_map_ref:
+                        suspicious_values += check_ref_values(
+                            core_v1.read_namespaced_config_map(
+                                env_from.config_map_ref.name, namespace).data,
+                            decoder=str)
+                    if env_from.secret_ref:
+                        suspicious_values += check_ref_values(
+                            core_v1.read_namespaced_secret(
+                                env_from.secret_ref.name, namespace).data,
+                            decoder=decode_base64)
             print(tabulate(suspicious_values))
 
 #             break
