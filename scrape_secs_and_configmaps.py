@@ -73,20 +73,26 @@ def check_ref_values(ref_data, decoder=str):
 
 
 def main():
-    """Here comes the magic."""
+    """
+    Here comes the magic.
+
+    Steps are roughly as follows:
+      - fetch all namespaces and choose those matching the regex
+      - fetch namespace deployment's containers
+      - fetch the ENV references (secrets and configmaps) for container
+      - parse the data part and search for 'suspicious' values
+    """
     # Configs can be set in Configuration class directly or using helper
     #  utility
     config.load_kube_config()
     core_v1 = client.CoreV1Api()
     apps_v1 = client.AppsV1Api()
 
-    print("---------------------\nListing namespaces\n----------------------")
     ret = core_v1.list_namespace(watch=False)
     for i in ret.items:
         if re.match(SCRAPED_NAMESPACE_REGEX, str(i.metadata.name)):
             suspicious_values = []
             namespace = i.metadata.name
-            print(namespace)
             deployment = apps_v1.list_namespaced_deployment(namespace)
             if len(deployment.items) == 0:
                 continue
@@ -105,10 +111,14 @@ def main():
                             core_v1.read_namespaced_secret(
                                 env_from.secret_ref.name, namespace).data,
                             decoder=decode_base64)
-            print(tabulate(suspicious_values))
-
-#             break
+            if suspicious_values:
+                headers = [namespace, '', '']
+                table = tabulate(suspicious_values, headers=headers)
+                print(f'{table}\n')
 
 
 if __name__ == '__main__':
     main()
+
+# TODOs
+#  - pass some things through the cmdline args
